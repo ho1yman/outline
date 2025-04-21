@@ -65,7 +65,8 @@ outline知识库部署
 8. 初始化oidc鉴权
 
    访问keycloak控制台页面，手动创建realm应用、realm客户端，生成密钥并填入到.env的OIDC_CLIENT_SECRET
-   重新创建outline容器，登录访问outline
 
-9. 完成！
+   通过`docker-compose up -d`重新创建outline容器，登录访问outline
+
+10. 完成！
 
