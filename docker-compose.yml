@@ -1,0 +1,164 @@
+networks:
+  outline_network:
+    driver: bridge
+    external: true 
+
+services:
+  # OIDC Server (Keycloak)
+  keycloak:
+    image: keycloak/keycloak:26.1.2   #quay.io/keycloak/keycloak:21.1.1
+    container_name: keycloak
+    ports:
+      - "${KEYCLOAK_PORT:-7780}:8080"
+    extra_hosts:
+      - "postgres:192.168.232.13"
+      - "${DOMAIN_NAME:-outline.local}:${HOST_IP:-192.168.63.147}"
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.12
+    command: start-dev        # 开发模式，可通过 KEYCLOAK_ADMIN 和 KEYCLOAK_ADMIN_PASSWORD 环境变量 初始化默认的管理员用户
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KEYCLOAK_ADMIN: admin                                # default user
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}  # default user's password
+      #KC_HEALTH_ENABLED: true
+      # 
+      KC_HOSTNAME: ${DOMAIN_NAME:-outline.local}
+      KC_HOSTNAME_STRICT: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # PostgreSQL for Outline
+  postgres:
+    image: postgres:15-alpine
+    container_name: outline-db
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.13
+    ports:
+      - "54322:5432"
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data
+    #environment:
+      #POSTGRES_DB: outline
+      #POSTGRES_USER: outline
+      #POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outline"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Outline
+  redis:
+    image: redis:7-alpine
+    container_name: outline-redis
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.14
+    volumes:
+      - ./redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO for S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    container_name: outline-minio
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.15
+    ports:
+      - "${MINIO_API_PORT:-7790}:9000"  # MinIO API port
+      - "${MINIO_CONSOLE_PORT:-7791}:9001"  # MinIO Console port
+    volumes:
+      - ./minio-data:/data
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Outline Wiki
+  outline:
+    image: outlinewiki/outline:0.83.0
+    container_name: outline
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.16
+    ports:
+      - "${OUTLINE_PORT:-7730}:3000"
+    extra_hosts:
+      - "postgres:192.168.232.13"
+      - "redis:192.168.232.14"
+      - "minio:192.168.232.15"
+      - "keycloak:192.168.232.12"
+      - "outline:192.168.232.16"
+      - "${DOMAIN_NAME:-outline.local}:${HOST_IP:-192.168.63.147}"
+      - "smtp.sina.com:123.126.45.161"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      # Database
+      PGSSLMODE: disable
+      DATABASE_URL: postgres://outline:${POSTGRES_PASSWORD}@postgres:5432/outline
+      DATABASE_URL_TEST: postgres://outline:${POSTGRES_PASSWORD}@postgres:5432/outline-test
+      
+      # Redis
+      REDIS_URL: redis://redis:6379
+      
+      # URL
+      URL: http://${DOMAIN_NAME:-outline.local}:${OUTLINE_PORT:-7730}   # http://${HOST_IP}:${OUTLINE_PORT:-7730} 
+      PORT: 3000
+      FORCE_HTTPS: "false"
+      
+      # Storage
+      FILE_STORAGE: s3
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+      AWS_S3_UPLOAD_BUCKET_NAME: outline-bucket    # visite http://outline.local:7791 to create it
+      AWS_S3_UPLOAD_BUCKET_URL: http://${DOMAIN_NAME:-outline.local}:7790
+      FILE_STORAGE_UPLOAD_MAX_SIZE: 26214400    #AWS_S3_UPLOAD_MAX_SIZE: 26214400
+      AWS_S3_FORCE_PATH_STYLE: 'true'
+      
+      # Authentication
+      OIDC_CLIENT_ID: outline
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}   #your_client_secret from Keycloak
+      OIDC_AUTH_URI: http://${DOMAIN_NAME:-outline.local}:${KEYCLOAK_PORT:-7780}/realms/outline/protocol/openid-connect/auth
+      OIDC_TOKEN_URI: http://${DOMAIN_NAME:-outline.local}:${KEYCLOAK_PORT:-7780}/realms/outline/protocol/openid-connect/token
+      OIDC_USERINFO_URI: http://${DOMAIN_NAME:-outline.local}:${KEYCLOAK_PORT:-7780}/realms/outline/protocol/openid-connect/userinfo
+      #OIDC_LOGOUT_URL: http://outline.local:7780/realms/outline/protocol/openid-connect/logout?redirect_uri=http://outline.local:7730/login
+      #OIDC_AUTO_SIGN_IN: true
+      OIDC_DISPLAY_NAME: Keycloak
+      
+      # Secret keys (generate with `openssl rand -hex 32`)
+      SECRET_KEY: replace_with_a_generated_secret
+      UTILS_SECRET: replace_with_another_generated_secret
+      
+      # 可选：设置默认语言
+      DEFAULT_LANGUAGE: zh_CN
+    restart: unless-stopped
