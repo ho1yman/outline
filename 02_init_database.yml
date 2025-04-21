@@ -1,0 +1,27 @@
+networks:
+  outline_network:
+    driver: bridge
+    external: true 
+
+services:
+  # PostgreSQL for Outline
+  postgres:
+    image: postgres:15-alpine
+    container_name: outline-db
+    networks:
+      outline_network:
+        ipv4_address: 192.168.232.13
+    ports:
+      - "54322:5432"
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: outline
+      POSTGRES_USER: outline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outline"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
