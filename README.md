@@ -3,13 +3,13 @@ outline知识库部署
 
 1. 创建compose项目路径
 
-   ```sql
+   ```sh
    mkdir /opt/compose/outline
    cd /opt/compose/outline
    ```
 2. 拉取容器镜像
 
-   ```sql
+   ```sh
    docker pull keycloak/keycloak:26.1.2
    docker pull postgres:15-alpine
    docker pull redis:7-alpine
@@ -18,12 +18,12 @@ outline知识库部署
    ```
 3. 创建docker network
 
-   ```sql
+   ```sh
    docker network create --driver bridge --subnet 192.168.232.0/24 outline_network
    ```
 4. 创建两个secretKey
 
-   ```sql
+   ```sh
    # create outline SECRET_KEY
    openssl rand -hex 32
    # create outline UTILS_SECRET
@@ -31,17 +31,17 @@ outline知识库部署
    ```
 5. 初始化数据库
 
-   ```sql
+   ```sh
    docker-compose -f init_database.yml up -d
    ```
 
    执行sql
 
    ```sql
-   # create role
+   -- # create role
    CREATE ROLE "keycloak" SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION BYPASSRLS PASSWORD 'your_password';
    
-   # create db
+   -- # create db
    CREATE DATABASE "keycloak"
    WITH
      OWNER = "keycloak"
@@ -51,12 +51,12 @@ outline知识库部署
 
    销毁容器
 
-   ```sql
+   ```sh
    docker-compose -f init_database.yml down
    ```
 6. 运行docker-compose.yml
 
-   ```sql
+   ```sh
    docker-compose up -d
    ```
 7. 创建minio bucket
