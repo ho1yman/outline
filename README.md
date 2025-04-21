@@ -1,6 +1,11 @@
 # outline
 outline知识库部署
 
+参考：
+
+https://github.com/outline/outline/
+
+
 1. 创建compose项目路径
 
    ```sh
