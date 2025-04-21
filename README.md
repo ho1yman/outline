@@ -13,7 +13,7 @@ https://github.com/outline/outline/
    ```
 2. 拉取容器镜像
 
-   ```shell
+   ```sh
    docker pull keycloak/keycloak:26.1.2
    docker pull postgres:15-alpine
    docker pull redis:7-alpine
@@ -22,7 +22,7 @@ https://github.com/outline/outline/
    ```
 3. 创建docker network
 
-   ```bash
+   ```sh
    docker network create --driver bridge --subnet 192.168.232.0/24 outline_network
    ```
 4. 创建两个secretKey
