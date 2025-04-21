@@ -39,7 +39,7 @@ outline知识库部署
 
    ```sql
    # create role
-   CREATE ROLE "keycloak" SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION BYPASSRLS PASSWORD 'passw0rd';
+   CREATE ROLE "keycloak" SUPERUSER CREATEDB CREATEROLE LOGIN REPLICATION BYPASSRLS PASSWORD 'your_password';
    
    # create db
    CREATE DATABASE "keycloak"
